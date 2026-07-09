@@ -1964,6 +1964,61 @@ def fetch_derive_assets(wallet: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+LIGHTER_BASE = "https://mainnet.zklighter.elliot.ai"
+
+
+def fetch_lighter_assets(wallet: dict[str, Any]) -> dict[str, Any]:
+    """Lighter (zkLighter) — public read-only via the L1 address, no API key.
+
+    One L1 address can map to several account indexes (main + isolated/vault
+    sub-accounts); the account endpoint returns them all in ``accounts[]``. We
+    sum each account's ``total_asset_value`` (collateral + unrealized PnL — the
+    USD net value) and mirror Hyperliquid's single ``PERP-ACCOUNT`` row so the
+    holdings sum equals the balance. Non-USDC reward tokens in ``assets[]``
+    (LIT etc., margin disabled) are excluded from ``total_asset_value`` by
+    Lighter, so ignoring them here keeps the balance clean."""
+    user = str(wallet.get("address", "") or "").strip()
+    if not user.lower().startswith("0x") or len(user) != 42:
+        raise RuntimeError(
+            "Lighter requires the wallet address to be a valid 0x… address."
+        )
+    payload = _request_json(
+        f"{LIGHTER_BASE}/api/v1/account",
+        params={"by": "l1_address", "value": user},
+        headers={"accept": "application/json"},
+    )
+    if not isinstance(payload, dict):
+        raise RuntimeError("Lighter: unexpected response shape.")
+    if payload.get("code") != 200:
+        # 21100 = account not found (address has never traded on Lighter).
+        raise RuntimeError(f"Lighter: {payload.get('message') or 'account not found'}.")
+
+    total_usd = 0.0
+    for acct in payload.get("accounts") or []:
+        if isinstance(acct, dict):
+            total_usd += _to_float(acct.get("total_asset_value", 0.0))
+
+    assets: list[dict[str, Any]] = []
+    if total_usd > 0:
+        assets.append(
+            {
+                "name": "PERP-ACCOUNT",
+                "symbol": "PERP-ACCOUNT",
+                "chain": "lighter",
+                "amount": total_usd,
+                "available": total_usd,
+                "locked": 0.0,
+                "unit_price": 1.0,
+                "usd_value": total_usd,
+            }
+        )
+    return {
+        "balance": total_usd,
+        "assets": assets,
+        "fetch_strategy": "lighter /api/v1/account?by=l1_address (sum total_asset_value)",
+    }
+
+
 def fetch_cex_assets(wallet: dict[str, Any]) -> dict[str, Any]:
     exchange = str(wallet.get("exchange", "") or "").strip().lower()
     if exchange == "binance":
@@ -1982,4 +2037,6 @@ def fetch_cex_assets(wallet: dict[str, Any]) -> dict[str, Any]:
         return fetch_derive_assets(wallet)
     if exchange == "hyperliquid":
         return fetch_hyperliquid_assets(wallet)
+    if exchange == "lighter":
+        return fetch_lighter_assets(wallet)
     raise ValueError(f"Unsupported CEX exchange '{exchange}'.")

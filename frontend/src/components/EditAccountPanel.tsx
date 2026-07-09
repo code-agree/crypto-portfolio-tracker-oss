@@ -33,9 +33,11 @@ const EXCHANGES: ExchangeDef[] = [
   { id: "gate", label: "Gate", fields: ["api_key", "api_secret"] },
   { id: "bitget", label: "Bitget", fields: ["api_key", "api_secret", "passphrase"] },
   { id: "okx", label: "OKX", fields: ["api_key", "api_secret", "passphrase"] },
+  { id: "bybit", label: "Bybit", fields: ["api_key", "api_secret"] },
   { id: "extended", label: "Extended", fields: ["api_key"] },
   { id: "hyperliquid", label: "Hyperliquid", fields: ["wallet_address"] },
   { id: "derive", label: "Derive", fields: ["wallet_address", "api_secret"] },
+  { id: "lighter", label: "Lighter", fields: ["wallet_address"] },
 ];
 
 const FIELD_LABELS: Record<CredField, string> = {
