@@ -4,17 +4,20 @@ import { useAuth } from "../auth/AuthContext";
 import { useApi } from "../hooks/useApi";
 import { useTranslation } from "../i18n/useTranslation";
 import { FirstRunOverlay } from "./FirstRunOverlay";
+import { TradeNotifier } from "./TradeNotifier";
 import { UserMenu } from "./UserMenu";
 
 interface Tab {
   id: string;
-  labelKey: "dashboard" | "accounts" | "balance" | "cashflow";
+  labelKey: "dashboard" | "accounts" | "balance" | "cashflow" | "positions" | "trades";
   end?: boolean;
 }
 
 const TABS: Tab[] = [
   { id: "/", labelKey: "dashboard", end: true },
   { id: "/accounts", labelKey: "accounts" },
+  { id: "/positions", labelKey: "positions" },
+  { id: "/trades", labelKey: "trades" },
   // Temporarily hidden — work in progress
   // { id: "/balance", labelKey: "balance" },
   // { id: "/cashflow", labelKey: "cashflow" },
@@ -70,6 +73,7 @@ export function Layout() {
       </div>
 
       {showFirstRun && <FirstRunOverlay />}
+      <TradeNotifier />
     </div>
   );
 }

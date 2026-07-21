@@ -6,6 +6,8 @@ import { Dashboard } from "./pages/Dashboard";
 import { Accounts } from "./pages/Accounts";
 import { Balance } from "./pages/Balance";
 import { Cashflow } from "./pages/Cashflow";
+import { Positions } from "./pages/Positions";
+import { Trades } from "./pages/Trades";
 import { Auth } from "./pages/Auth";
 import { Settings } from "./pages/Settings";
 
@@ -25,6 +27,8 @@ export default function App() {
         >
           <Route index element={<Dashboard />} />
           <Route path="accounts" element={<Accounts />} />
+          <Route path="positions" element={<Positions />} />
+          <Route path="trades" element={<Trades />} />
           <Route path="balance" element={<Balance />} />
           <Route path="cashflow" element={<Cashflow />} />
           <Route path="settings" element={<Settings />} />

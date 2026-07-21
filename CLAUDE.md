@@ -74,9 +74,19 @@ Each account has at most one `account_snapshots` row (primary key = `account_id`
 - `sync_account` / `sync_user_accounts` — live fetch, persists snapshot, returns `SyncResult` with `ok` / `skipped` / `error`. Partial failures are tolerated (a missing `/complex_app_list` doesn't fail the whole sync). A lightweight in-process throttle (`ratelimit.check_sync_allowed`) guards against accidental spam of the paid provider APIs.
 - `validate_account` — dry-run fetch used by the accounts router on PATCH. Accepts a `pending_cred` so in-memory edits to credentials can be validated before commit. Raises `ValidationFailed`; the router must `db.rollback()` on failure.
 
+### Positions & trades
+
+- `GET /api/positions` (`routers/positions.py`) — cross-account view built purely from stored snapshots (no external calls): all `kind=pos` holdings plus spot exposure aggregated by symbol.
+- **Trades** (`routers/trades.py`, `services/trades.py`, `integrations/binance_trades.py`) — Binance-only fill ingestion into the `trades` table, deduped by `(account_id, market, trade_id)`. Spot symbols are derived from the account's synced holdings (top 12 non-stables × USDT/USDC — spot `myTrades` requires a symbol); futures symbols are discovered via `/fapi/v1/income` (no symbol needed), then fills come from `userTrades`. Cursor = `max(trades.ts)` per account+market; first pull looks back 7 days. `POST /api/trades/sync` is throttled per user (`TRADES_MIN_INTERVAL_SECONDS`, default 60s). Stats (`/api/trades/stats`) treat `quote_qty` as USD — valid because only stable-quoted pairs are ingested.
+- Frontend: `pages/Positions.tsx`, `pages/Trades.tsx`; `components/TradeNotifier.tsx` polls `syncTrades` + `listTrades` every 3 min while the app is open and shows an in-app toast for unseen fills (last-seen trade id in localStorage, per user).
+
 ### Frontend data layer
 
 `src/api.ts` is the single typed API client (`fetch` with `credentials: "include"`). All hooks go through `src/hooks/useApi.ts`, which implements stale-while-revalidate with a two-tier cache (in-memory `Map` + `localStorage`). `key` must be passed to opt into caching; the cache is scoped per user via `setCacheScope`. Route structure is a flat `Routes` tree in `App.tsx` with a `RequireAuth` wrapper around the authenticated shell.
+
+### Single-process deploy
+
+Set `SERVE_FRONTEND_DIST=<repo>/frontend/dist` and the uvicorn process serves the built SPA too (catch-all route registered after `/api/*`, with a path-traversal guard). Preferred on small hosts — no Nginx/Node at runtime.
 
 ## Gotchas
 

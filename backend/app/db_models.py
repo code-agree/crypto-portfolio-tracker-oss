@@ -189,6 +189,45 @@ class AccountSnapshotHistoryRow(Base):
     holdings: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
 
 
+class TradeRow(Base):
+    """One exchange fill (execution). Deduped by (account_id, market,
+    trade_id) — exchange trade ids are only unique per market, and spot ids
+    can collide with futures ids for the same account."""
+
+    __tablename__ = "trades"
+    __table_args__ = (
+        UniqueConstraint(
+            "account_id", "market", "trade_id", name="uq_trades_account_market_trade"
+        ),
+        Index("ix_trades_user_ts", "user_id", "ts"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(
+        String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    account_id: Mapped[str] = mapped_column(
+        String, ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    exchange: Mapped[str] = mapped_column(String, nullable=False, default="")
+    market: Mapped[str] = mapped_column(String, nullable=False, default="spot")  # spot|futures
+    symbol: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    trade_id: Mapped[str] = mapped_column(String, nullable=False)
+    order_id: Mapped[str] = mapped_column(String, nullable=False, default="")
+    side: Mapped[str] = mapped_column(String, nullable=False)  # buy|sell
+    price: Mapped[float] = mapped_column(Float, nullable=False)
+    qty: Mapped[float] = mapped_column(Float, nullable=False)
+    quote_qty: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    fee: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    fee_asset: Mapped[str] = mapped_column(String, nullable=False, default="")
+    realized_pnl: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    is_maker: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    ts: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), nullable=False
+    )
+
+
 class UserAutoSyncRow(Base):
     __tablename__ = "user_auto_sync"
 

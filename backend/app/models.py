@@ -17,7 +17,10 @@ class SignupRequest(BaseModel):
 
 
 class LoginRequest(BaseModel):
-    email: EmailStr
+    # Plain string, not EmailStr: the login identifier may be a non-email
+    # username (e.g. a shared team account renamed by the operator). Signup
+    # still enforces a well-formed email.
+    email: str = Field(min_length=1, max_length=254)
     password: str = Field(min_length=1, max_length=256)
 
 
@@ -242,6 +245,118 @@ class SyncSummary(BaseModel):
 class SyncEstimate(BaseModel):
     accounts_count: int
     remote_accounts: int
+
+
+# ── Positions (aggregated across accounts) ───────────────────────────────
+
+class PositionRow(BaseModel):
+    """One derivative/DeFi position (`kind=pos` holding) with its account."""
+    account_id: str
+    account_name: str
+    venue: str  # exchange name or chain the position lives on
+    sym: str
+    name: str
+    proto: str
+    chain: str
+    amt: str
+    price: str
+    usd: float
+    apr: Optional[str] = None
+    excluded: bool = False
+
+
+class PositionAssetRow(BaseModel):
+    """Spot exposure for one symbol aggregated across every account."""
+    sym: str
+    name: str
+    usd: float
+    pct: float
+    accounts: int
+    chains: int
+
+
+class PositionsSummary(BaseModel):
+    positions: list[PositionRow]
+    positions_total_usd: float
+    assets: list[PositionAssetRow]
+    assets_total_usd: float
+    last_sync_at: Optional[datetime] = None
+
+
+# ── Trades ───────────────────────────────────────────────────────────────
+
+TradeMarket = Literal["spot", "futures"]
+
+
+class TradeOut(BaseModel):
+    id: int
+    account_id: str
+    account_name: str
+    exchange: str
+    market: str
+    symbol: str
+    side: str
+    price: float
+    qty: float
+    quote_qty: float
+    fee: float
+    fee_asset: str
+    realized_pnl: float
+    is_maker: bool
+    ts: datetime
+
+
+class TradeList(BaseModel):
+    items: list[TradeOut]
+    total: int
+
+
+class TradeSyncAccountResult(BaseModel):
+    account_id: str
+    name: str
+    status: SyncStatus
+    new_trades: int
+    message: Optional[str] = None
+
+
+class TradeSyncSummary(BaseModel):
+    accounts: list[TradeSyncAccountResult]
+    new_trades: int
+
+
+class TradeFee(BaseModel):
+    asset: str
+    amount: float
+
+
+class TradeDayPoint(BaseModel):
+    t: str  # YYYY-MM-DD (UTC)
+    volume: float
+    pnl: float
+    count: int
+
+
+class TradeSymbolStat(BaseModel):
+    symbol: str
+    market: str
+    trades: int
+    volume: float
+    pnl: float
+
+
+class TradeStats(BaseModel):
+    days: int
+    total_trades: int
+    buy_count: int
+    sell_count: int
+    volume_usd: float
+    realized_pnl: float
+    win_count: int
+    loss_count: int
+    win_rate: Optional[float] = None  # None until there are closed PnL fills
+    fees: list[TradeFee]
+    by_day: list[TradeDayPoint]
+    by_symbol: list[TradeSymbolStat]
 
 
 # ── Auto sync ────────────────────────────────────────────────────────────

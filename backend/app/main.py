@@ -23,8 +23,10 @@ from .routers import (
     credentials,
     dashboard,
     groups,
+    positions,
     prices,
     sync,
+    trades,
 )
 
 
@@ -77,8 +79,37 @@ app.include_router(balance.router)
 app.include_router(cashflow.router)
 app.include_router(sync.router)
 app.include_router(prices.router)
+app.include_router(positions.router)
+app.include_router(trades.router)
 
 
 @app.get("/api/health")
 def health() -> dict[str, str]:
     return {"status": "ok", "service": "crypto-portfolio-tracker"}
+
+
+# Optional single-process deploy: set SERVE_FRONTEND_DIST to the built SPA
+# directory (frontend/dist) and this process serves the frontend too — no
+# Nginx/Node needed. Registered after all /api routes so those match first.
+_static_dir = os.getenv("SERVE_FRONTEND_DIST", "").strip()
+if _static_dir:
+    from pathlib import Path
+
+    from fastapi.responses import FileResponse
+
+    _static_root = Path(_static_dir).resolve()
+    if (_static_root / "index.html").is_file():
+
+        @app.get("/{full_path:path}", include_in_schema=False)
+        def spa(full_path: str) -> FileResponse:
+            candidate = (_static_root / full_path).resolve()
+            # Path traversal guard: only serve files inside the dist dir.
+            if (
+                full_path
+                and candidate.is_file()
+                and candidate.is_relative_to(_static_root)
+            ):
+                return FileResponse(candidate)
+            # Anything else (including client routes like /positions) gets
+            # the SPA shell; the router takes it from there.
+            return FileResponse(_static_root / "index.html")

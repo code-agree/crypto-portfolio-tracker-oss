@@ -11,10 +11,14 @@ import type {
   CredentialsStatus,
   DashboardSummary,
   Group,
+  PositionsSummary,
   SyncEstimate,
   SyncResult,
   SyncSummary,
   TopAsset,
+  TradeList,
+  TradeStats,
+  TradeSyncSummary,
   User,
 } from "./types";
 
@@ -138,6 +142,23 @@ export const api = {
     http<{ symbol: string; price_usd: number; source: string }>(
       `/api/prices/${encodeURIComponent(symbol)}`,
     ),
+
+  // Positions — cross-account view of the latest snapshots
+  positions: () => http<PositionsSummary>("/api/positions"),
+
+  // Trades — pull/list Binance fills + aggregates
+  syncTrades: () => http<TradeSyncSummary>("/api/trades/sync", { method: "POST" }),
+  listTrades: (q?: { limit?: number; offset?: number; market?: string; symbol?: string; days?: number }) => {
+    const params = new URLSearchParams();
+    if (q?.limit) params.set("limit", String(q.limit));
+    if (q?.offset) params.set("offset", String(q.offset));
+    if (q?.market) params.set("market", q.market);
+    if (q?.symbol) params.set("symbol", q.symbol);
+    if (q?.days) params.set("days", String(q.days));
+    const suffix = params.toString() ? `?${params.toString()}` : "";
+    return http<TradeList>(`/api/trades${suffix}`);
+  },
+  tradeStats: (days: number = 30) => http<TradeStats>(`/api/trades/stats?days=${days}`),
 
   // Daily auto-sync
   autoSyncSettings: () => http<AutoSyncSettings>("/api/auto-sync/settings"),

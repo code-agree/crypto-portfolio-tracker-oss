@@ -32,10 +32,17 @@ PRICE_MIN_INTERVAL_SECONDS = float(os.getenv("PRICE_MIN_INTERVAL_SECONDS", "1.0"
 PRICE_WINDOW_SECONDS = int(os.getenv("PRICE_WINDOW_SECONDS", "60"))
 PRICE_MAX_LOOKUPS_PER_WINDOW = int(os.getenv("PRICE_MAX_LOOKUPS_PER_WINDOW", "30"))
 
+# Minimum seconds between Binance trade-history pulls for a single user.
+# These hit the user's own API keys (not operator quota) but each pull fans
+# out into one signed request per symbol, so keep the frontend poller honest.
+TRADES_MIN_INTERVAL_SECONDS = int(os.getenv("TRADES_MIN_INTERVAL_SECONDS", "60"))
+
 _sync_last_call: dict[str, float] = {}
 _price_calls: dict[str, list[float]] = {}
+_trades_last_call: dict[str, float] = {}
 _sync_lock = threading.Lock()
 _price_lock = threading.Lock()
+_trades_lock = threading.Lock()
 
 
 def check_sync_allowed(user_id: str) -> None:
@@ -51,6 +58,21 @@ def check_sync_allowed(user_id: str) -> None:
                 retry = max(1, int(SYNC_MIN_INTERVAL_SECONDS - elapsed))
                 raise RateLimited(scope="sync", retry_after_seconds=retry)
         _sync_last_call[user_id] = now
+
+
+def check_trades_allowed(user_id: str) -> None:
+    """Raise ``RateLimited`` if ``user_id`` pulled trade history too recently."""
+    if TRADES_MIN_INTERVAL_SECONDS <= 0:
+        return
+    now = time.monotonic()
+    with _trades_lock:
+        last = _trades_last_call.get(user_id)
+        if last is not None:
+            elapsed = now - last
+            if elapsed < TRADES_MIN_INTERVAL_SECONDS:
+                retry = max(1, int(TRADES_MIN_INTERVAL_SECONDS - elapsed))
+                raise RateLimited(scope="trades", retry_after_seconds=retry)
+        _trades_last_call[user_id] = now
 
 
 def check_price_allowed(user_id: str) -> None:

@@ -414,7 +414,9 @@ def _build_cex_positions(
     if exchange == "derive":
         return _build_derive_positions(positions)
     out: list[dict[str, Any]] = []
-    proto_label = f"{exchange.upper()} Perp" if exchange == "okx" else exchange.upper()
+    proto_label = (
+        f"{exchange.upper()} Perp" if exchange in ("okx", "binance") else exchange.upper()
+    )
     for p in positions or []:
         size = abs(float(p.get("size", 0.0) or 0.0))
         notional = abs(float(p.get("notional_usd", 0.0) or 0.0))

@@ -411,11 +411,58 @@ def _fetch_binance_futures_assets(
     return total_margin_balance, assets, "binance /fapi/v2/account"
 
 
+def _fetch_binance_positions(creds: dict[str, str], url: str) -> list[dict[str, Any]]:
+    """Open USDⓈ-M positions from a positionRisk-style endpoint, mapped to
+    the generic shape ``services.sync._build_cex_positions`` renders
+    (instId/size/posSide/leverage/upl/mark_price/avg_price/notional_usd).
+    Informational only — margin + uPnL are already inside the wallet
+    balances, so these rows must not add to the synced total."""
+    params = _binance_signed_params(
+        creds["api_secret"],
+        {"recvWindow": "5000", "timestamp": str(_now_ms())},
+    )
+    payload = _request_json_allow_statuses(
+        url,
+        headers=_binance_headers(creds["api_key"]),
+        params=params,
+        allowed_statuses={401, 403},
+    )
+    if not isinstance(payload, list):
+        return []
+    out: list[dict[str, Any]] = []
+    for p in payload:
+        if not isinstance(p, dict):
+            continue
+        amt = _to_float(p.get("positionAmt"))
+        if amt == 0:
+            continue
+        symbol = str(p.get("symbol") or "").strip().upper()
+        if not symbol:
+            continue
+        mark = _to_float(p.get("markPrice"))
+        notional = _to_float(p.get("notional")) or abs(amt) * mark
+        side = str(p.get("positionSide") or "").strip().lower()
+        if side not in ("long", "short"):  # one-way mode reports "BOTH"
+            side = "long" if amt > 0 else "short"
+        out.append({
+            "instId": symbol,
+            "size": amt,
+            "posSide": side,
+            "leverage": str(p.get("leverage") or ""),
+            "upl": _to_float(p.get("unRealizedProfit")),
+            "mark_price": mark,
+            "avg_price": _to_float(p.get("entryPrice")),
+            "notional_usd": abs(notional),
+        })
+    return out
+
+
 def fetch_binance_assets(wallet: dict[str, Any]) -> dict[str, Any]:
     creds = _load_cex_credentials(wallet)
     total_usd = 0.0
     assets: list[dict[str, Any]] = []
     strategies: list[str] = []
+    positions: list[dict[str, Any]] = []
 
     # Classic mode always has a spot wallet; unified/PM mode keeps one too
     # (just usually empty once funds are transferred into the PM pool), so
@@ -441,9 +488,24 @@ def fetch_binance_assets(wallet: dict[str, Any]) -> dict[str, Any]:
             assets.extend(futures_assets)
             strategies.append(futures_strategy)
 
+    # Open USDⓈ-M positions for display. PM accounts expose them under papi,
+    # classic accounts under fapi; a failure here shouldn't fail the sync.
+    try:
+        if pm_strategy:
+            positions = _fetch_binance_positions(
+                creds, "https://papi.binance.com/papi/v1/um/positionRisk"
+            )
+        else:
+            positions = _fetch_binance_positions(
+                creds, "https://fapi.binance.com/fapi/v2/positionRisk"
+            )
+    except Exception:  # noqa: BLE001 — positions are best-effort
+        positions = []
+
     return {
         "balance": total_usd,
         "assets": assets,
+        "positions": positions,
         "fetch_strategy": f"{' + '.join(strategies) or 'binance'} via {creds['prefix']}_*",
     }
 

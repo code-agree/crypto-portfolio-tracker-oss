@@ -126,11 +126,13 @@ function AuthPanel({
           <span className="mono-xs">{t.auth.email}</span>
           <input
             className="winput auth-input"
-            type="email"
-            autoComplete="email"
+            // Login accepts a plain username (e.g. a shared team account);
+            // signup still requires a well-formed email.
+            type={mode === "signup" ? "email" : "text"}
+            autoComplete={mode === "signup" ? "email" : "username"}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder={t.auth.placeholderEmail}
+            placeholder={mode === "signup" ? t.auth.placeholderEmail : t.auth.placeholderLoginId}
             required
           />
         </label>
