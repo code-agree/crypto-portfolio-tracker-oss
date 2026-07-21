@@ -449,6 +449,7 @@ export const zh: TranslationDict = {
   trades: {
     title: "成交",
     subtitle: "Binance 成交记录 · 通过你的 API Key 拉取，仅存储在本地",
+    autoRefresh: "页面打开时每分钟自动刷新",
     pull: "拉取最新成交",
     pulling: "拉取中…",
     pullResult: (n: number) => `新增 ${n} 笔成交`,

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api, ApiError } from "../api";
 import type { TradeItem } from "../types";
 import { BarList, Delta, LineChart } from "../lib/charts";
@@ -40,6 +40,22 @@ export function Trades() {
     `trades:list:${days}:${limit}`,
   );
 
+  // Live refresh while the page is open: pull from Binance (server-side
+  // throttle turns extra calls into cheap 429s) and silently refetch the
+  // list + stats. The SWR cache in useApi means rows update in place with
+  // no loading flash. Paused while the tab is hidden.
+  useEffect(() => {
+    const tick = async () => {
+      if (document.visibilityState !== "visible") return;
+      await api.syncTrades().catch(() => null);
+      stats.refetch();
+      list.refetch();
+    };
+    const timer = setInterval(tick, 60_000);
+    return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const pull = async () => {
     if (pulling) return;
     setPulling(true);
@@ -74,7 +90,9 @@ export function Trades() {
       <div className="sheet-head">
         <div>
           <h2>{t.trades.title}</h2>
-          <div className="tiny mt-8">{t.trades.subtitle}</div>
+          <div className="tiny mt-8">
+            {t.trades.subtitle} · {t.trades.autoRefresh}
+          </div>
         </div>
         <div className="row" style={{ gap: 10, alignItems: "center" }}>
           {pullMsg && <span className="tiny muted">{pullMsg}</span>}

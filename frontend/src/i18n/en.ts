@@ -467,6 +467,7 @@ export const en = {
   trades: {
     title: "Trades",
     subtitle: "Binance fills · pulled from your API keys, stored locally",
+    autoRefresh: "auto-refreshes every minute while open",
     pull: "Pull latest fills",
     pulling: "Pulling…",
     pullResult: (n: number) => `${n} new fills`,
