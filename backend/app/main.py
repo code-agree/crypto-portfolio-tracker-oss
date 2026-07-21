@@ -100,7 +100,9 @@ if _static_dir:
     _static_root = Path(_static_dir).resolve()
     if (_static_root / "index.html").is_file():
 
-        @app.get("/{full_path:path}", include_in_schema=False)
+        @app.api_route(
+            "/{full_path:path}", methods=["GET", "HEAD"], include_in_schema=False
+        )
         def spa(full_path: str) -> FileResponse:
             candidate = (_static_root / full_path).resolve()
             # Path traversal guard: only serve files inside the dist dir.
@@ -109,7 +111,20 @@ if _static_dir:
                 and candidate.is_file()
                 and candidate.is_relative_to(_static_root)
             ):
-                return FileResponse(candidate)
+                # Vite content-hashes everything under assets/, so those are
+                # safe to cache forever; other files get revalidated.
+                cache = (
+                    "public, max-age=31536000, immutable"
+                    if full_path.startswith("assets/")
+                    else "no-cache"
+                )
+                return FileResponse(candidate, headers={"Cache-Control": cache})
             # Anything else (including client routes like /positions) gets
-            # the SPA shell; the router takes it from there.
-            return FileResponse(_static_root / "index.html")
+            # the SPA shell; the router takes it from there. no-cache forces
+            # revalidation so a redeploy is picked up on the next load —
+            # without it browsers heuristically cache the shell and keep
+            # running a stale bundle.
+            return FileResponse(
+                _static_root / "index.html",
+                headers={"Cache-Control": "no-cache"},
+            )
